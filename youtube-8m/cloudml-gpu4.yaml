@@ -1,0 +1,4 @@
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: standard
+  runtimeVersion: "1.14"

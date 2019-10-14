@@ -1,0 +1,4 @@
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: standard_p100
+  runtimeVersion: "1.14"

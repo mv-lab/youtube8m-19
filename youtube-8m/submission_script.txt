@@ -1,0 +1,60 @@
+JOB_NAME=yt8m_train_$(date +%Y%m%d_%H%M%S); gcloud --verbosity=debug ai-platform jobs \
+submit training $JOB_NAME \
+--package-path=youtube-8m --module-name=youtube-8m.train \
+--staging-bucket=$bucket_name --region=us-east1 \
+--config=youtube-8m/cloudml-gpu.yaml \
+--runtime-version=1.14 \
+-- --train_data_pattern='gs://youtube8m-ml-us-east1/2/frame/train/train*.tfrecord' \
+--frame_features=True --model=AttentionModel --feature_names="rgb,audio" \
+--feature_sizes="1024,128" --batch_size=128 \
+--train_dir=$bucket_name/yt8m_train_frame_level_attention_model3 \
+--start_new_model=True \
+--max_steps=60100 --export_model_steps=60000 \
+--learning_rate_decay=0.8 --base_learning_rate=0.0008 --is_train=True
+
+##before base_learning_rate is 0.0008
+
+JOB_NAME=yt8m_train_$(date +%Y%m%d_%H%M%S); gcloud --verbosity=debug ml-engine jobs \
+submit training $JOB_NAME \
+--package-path=youtube-8m --module-name=youtube-8m.train \
+--staging-bucket=$bucket_name --region=us-east1 \
+--config=youtube-8m/cloudml-gpu.yaml \
+--runtime-version=1.14 \
+-- --train_data_pattern='gs://youtube8m-ml-us-east1/3/frame/validate/validate*.tfrecord' \
+--frame_features=True --model=AttentionModel \
+--feature_names="rgb,audio" --feature_sizes="1024,128" --batch_size=128 \
+--train_dir=$bucket_name/yt8m_train_frame_level_attention_model3 \
+--max_steps=62100 --export_model_steps=2000 \
+--learning_rate_decay=0.8 --base_learning_rate=0.0008 \
+--start_new_model=False --segment_labels=True --is_train=False
+
+
+JOB_TO_EVAL=yt8m_train_frame_level_attention_model3
+JOB_NAME=yt8m_eval_$(date +%Y%m%d_%H%M%S); gcloud --verbosity=debug ml-engine jobs \
+submit training $JOB_NAME \
+--package-path=youtube-8m --module-name=youtube-8m.eval \
+--staging-bucket=$bucket_name --region=us-east1 \
+--config=youtube-8m/cloudml-gpu2.yaml \
+-- --eval_data_pattern='gs://youtube8m-ml-us-east1/3/frame/validate/validate*.tfrecord' \
+--model=AttentionModel  \
+--train_dir=$bucket_name/${JOB_TO_EVAL} --run_once=True \
+--feature_names="rgb,audio" --feature_sizes="1024,128" --batch_size=128 \
+--frame_features=True \
+--segment_labels=True --is_train=False
+
+
+JOB_TO_EVAL=yt8m_train_frame_level_attention_model3
+JOB_NAME=yt8m_inference_$(date +%Y%m%d_%H%M%S); gcloud --verbosity=debug ml-engine jobs \
+submit training $JOB_NAME \
+--package-path=youtube-8m --module-name=youtube-8m.inference \
+--staging-bucket=$bucket_name --region=us-east1 \
+--config=youtube-8m/cloudml-gpu3.yaml \
+-- --input_data_pattern='gs://youtube8m-ml/3/frame/test/test*.tfrecord' \
+--train_dir=$bucket_name/${JOB_TO_EVAL} \
+--output_file=$bucket_name/${JOB_TO_EVAL}/predictions.csv \
+--model=AttentionModel  \
+--feature_names="rgb,audio" --feature_sizes="1024,128" --batch_size=128 \
+--frame_features=True --batch_size=128 \
+--segment_labels=True \
+--segment_label_ids_file=youtube-8m/segment_label_ids.csv \
+--top_k=100 --is_train=False
